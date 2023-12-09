@@ -6,7 +6,7 @@ export interface PullRequest {
     head: Branch
 }
 
-interface Branch {
+export interface Branch {
     ref: string
 }
 

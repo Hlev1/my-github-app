@@ -12,7 +12,16 @@ export async function getAllUpstreamPulls(
         return pulls
     }
 
-    return getAllUpstreamPullsRec(octokit, pull, pulls)
+    return (await getAllUpstreamPullsRec(octokit, pull, pulls)).reverse()
+}
+
+export async function getAllDownstreamPulls(
+    octokit: InstanceType<typeof ProbotOctokit>,
+    pull: PullRequest
+): Promise<PullRequest[]> {
+    var pulls: PullRequest[] = []
+
+    return (await getAllDownstreamPullsRec(octokit, pull, pulls))
 }
 
 async function getAllUpstreamPullsRec(
@@ -20,31 +29,64 @@ async function getAllUpstreamPullsRec(
     pull: PullRequest,
     allPulls: PullRequest[],
 ): Promise<PullRequest[]> {
-    console.log(pull)
-    const [{ number, base, head }] = (await octokit.pulls.list({
+    const pullList = (await octokit.pulls.list({
         repo: pull.repo.name,
-        owner: pull.repo.name,
+        owner: pull.repo.owner,
         head: `${pull.repo.owner}:${pull.base.ref}`
     })).data
 
+    if (pullList.length == 0) {
+        return allPulls
+    }
+
     var nextPull: PullRequest = {
-        number: number,
+        number: pullList[0].number,
         repo: {
-            name: base.repo.name,
-            owner: base.repo.owner.name ?? base.repo.owner.login
+            name: pullList[0].base.repo.name,
+            owner: pullList[0].base.repo.owner.name ?? pullList[0].base.repo.owner.login
         },
         base: {
-            ref: base.ref
+            ref: pullList[0].base.ref
         },
         head: {
-            ref: head.ref
+            ref: pullList[0].head.ref
         }
     }
 
-    if (nextPull) {
-        allPulls.push(nextPull)
-        return getAllUpstreamPullsRec(octokit, nextPull, allPulls)
+    allPulls.push(nextPull)
+    return getAllUpstreamPullsRec(octokit, nextPull, allPulls)
+}
+
+async function getAllDownstreamPullsRec(
+    octokit: InstanceType<typeof ProbotOctokit>,
+    pull: PullRequest,
+    allPulls: PullRequest[],
+): Promise<PullRequest[]> {
+    const pullList = (await octokit.pulls.list({
+        repo: pull.repo.name,
+        owner: pull.repo.owner,
+        base: `${pull.repo.owner}:${pull.head.ref}`
+    })).data
+
+    console.log(pullList)
+    if (pullList.length == 0) {
+        return allPulls
     }
 
-    return allPulls
+    var nextPull: PullRequest = {
+        number: pullList[0].number,
+        repo: {
+            name: pullList[0].base.repo.name,
+            owner: pullList[0].base.repo.owner.name ?? pullList[0].base.repo.owner.login
+        },
+        base: {
+            ref: pullList[0].base.ref
+        },
+        head: {
+            ref: pullList[0].head.ref
+        }
+    }
+
+    allPulls.push(nextPull)
+    return getAllUpstreamPullsRec(octokit, nextPull, allPulls)
 }
