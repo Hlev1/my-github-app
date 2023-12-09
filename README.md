@@ -9,6 +9,7 @@
 npm install
 
 # Run the bot
+npm run build
 npm start
 ```
 
